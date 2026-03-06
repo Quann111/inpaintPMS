@@ -66,6 +66,11 @@ const App: React.FC = () => {
 
     const [model, setModel] = useState<ModelType>('gemini-2.5-flash-image');
     const [imageSize, setImageSize] = useState<ImageSize>('1K');
+    const [apiKey, setApiKey] = useState<string>(() => localStorage.getItem('GEMINI_API_KEY') || '');
+
+    useEffect(() => {
+        localStorage.setItem('GEMINI_API_KEY', apiKey);
+    }, [apiKey]);
 
     const [preFullscreenState, setPreFullscreenState] = useState<{
         maskData: MaskData | null;
@@ -319,7 +324,14 @@ const App: React.FC = () => {
                 });
             }));
 
+            if (!apiKey && model !== 'gemini-3-pro-image-preview') {
+                setError('Please enter your Gemini API Key first.');
+                setIsLoading(false);
+                return;
+            }
+
             const result = await generateInpaintedImage(
+                apiKey,
                 preparedImageBase64, 
                 mimeType, 
                 prompt, 
@@ -340,7 +352,7 @@ const App: React.FC = () => {
         } finally {
             setIsLoading(false);
         }
-    }, [originalImage, maskData, prompt, userDefinedBox, maskOpacity, referenceImages, model, imageSize]);
+    }, [originalImage, maskData, prompt, userDefinedBox, maskOpacity, referenceImages, model, imageSize, apiKey]);
 
     const handleStitch = useCallback(async () => {
         if (!originalImage || !generatedFocusImage || !focusData) return;
@@ -369,12 +381,17 @@ const App: React.FC = () => {
         setIsEnhancingPrompt(true);
         try {
             const { preparedImageBase64, mimeType } = await prepareImageForGemini(originalImage, maskData, userDefinedBox, maskOpacity);
-            const enhanced = await enhancePrompt(preparedImageBase64, mimeType, prompt);
+            if (!apiKey && model !== 'gemini-3-pro-image-preview') {
+                setError('Please enter your Gemini API Key first.');
+                setIsEnhancingPrompt(false);
+                return;
+            }
+            const enhanced = await enhancePrompt(apiKey, preparedImageBase64, mimeType, prompt);
             setPrompt(enhanced);
         } finally {
             setIsEnhancingPrompt(false);
         }
-    }, [originalImage, maskData, userDefinedBox, prompt, maskOpacity]);
+    }, [originalImage, maskData, userDefinedBox, prompt, maskOpacity, apiKey]);
 
     const isBusy = isLoading || isStitching || isEnhancingPrompt;
     const canCompare = !!preparedImage && !!generatedFocusImage;
@@ -386,12 +403,13 @@ const App: React.FC = () => {
     return (
         <div className="min-h-screen text-slate-200 font-sans">
             <Header 
+                apiKey={apiKey}
+                onApiKeyChange={setApiKey}
                 model={model} 
                 onModelChange={setModel} 
                 imageSize={imageSize} 
                 onImageSizeChange={setImageSize} 
                 isBusy={isBusy}
-                onSelectApiKey={handleOpenApiKeyDialog}
             />
             <main className="p-4 md:p-8">
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">

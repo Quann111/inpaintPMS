@@ -4,21 +4,23 @@ import { KeyIcon, FacebookIcon, LinkedInIcon, EnvelopeIcon, GlobeIcon, ZaloIcon 
 import type { ModelType, ImageSize } from '../types';
 
 interface HeaderProps {
+    apiKey: string;
+    onApiKeyChange: (key: string) => void;
     model: ModelType;
     onModelChange: (model: ModelType) => void;
     imageSize: ImageSize;
     onImageSizeChange: (size: ImageSize) => void;
     isBusy: boolean;
-    onSelectApiKey: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({ 
+    apiKey,
+    onApiKeyChange,
     model, 
     onModelChange, 
     imageSize, 
     onImageSizeChange, 
     isBusy,
-    onSelectApiKey
 }) => {
     return (
         <header className="w-full bg-slate-800 border-b border-slate-700 p-3 shadow-md flex justify-between items-center sticky top-0 z-40">
@@ -31,8 +33,22 @@ export const Header: React.FC<HeaderProps> = ({
                  </h1>
             </div>
 
+            <div className="flex items-center gap-4 ml-auto">
+                <div className="flex items-center gap-2 bg-slate-900/80 rounded-lg p-1 border border-slate-600">
+                    <KeyIcon className="w-4 h-4 text-slate-500 ml-1" />
+                    <input
+                        type="password"
+                        placeholder="Enter API Key..."
+                        value={apiKey}
+                        onChange={(e) => onApiKeyChange(e.target.value)}
+                        disabled={isBusy}
+                        className="bg-transparent text-xs text-slate-200 outline-none w-40 placeholder:text-slate-600"
+                    />
+                </div>
+            </div>
+
             {/* Credit Section - Aligned Right */}
-            <div className="hidden xl:flex items-center gap-3 text-xs text-swiss-text-muted ml-auto mr-6">
+            <div className="hidden xl:flex items-center gap-3 text-xs text-swiss-text-muted ml-6 mr-6">
                 <span>Phát triển bởi <a href="https://baoanh-nguyen.id.vn" target="_blank" rel="noopener noreferrer" className="text-swiss-text-muted hover:text-cyan-400 transition-colors" title="Website">Bảo Anh Nguyễn</a></span>
                 <div className="flex items-center gap-2 border-l border-swiss-border pl-3">
                     <span className="text-swiss-text-muted text-xs">Liên hệ:</span>
@@ -88,18 +104,6 @@ export const Header: React.FC<HeaderProps> = ({
                         Pro
                     </button>
                 </div>
-
-                {/* API Key Button (Only for Pro) */}
-                {model === 'gemini-3-pro-image-preview' && (
-                    <button
-                        onClick={onSelectApiKey}
-                        disabled={isBusy}
-                        title="Configure Paid API Key"
-                        className="p-2 bg-blue-500/10 text-blue-400 hover:bg-blue-500/20 rounded-lg border border-blue-500/30 transition-colors"
-                    >
-                        <KeyIcon className="w-4 h-4" />
-                    </button>
-                )}
             </div>
         </header>
     );

@@ -4,6 +4,7 @@ import type { GenerateContentResponse } from '@google/genai';
 import type { ModelType, ImageSize, AspectRatio } from '../types';
 
 export async function generateInpaintedImage(
+    apiKey: string,
     base64ImageData: string,
     mimeType: string,
     prompt: string,
@@ -14,8 +15,7 @@ export async function generateInpaintedImage(
     imageSize: ImageSize = '1K'
 ): Promise<string> {
     try {
-        // FIX: Always use new GoogleGenAI({ apiKey: process.env.API_KEY }) directly as per guidelines.
-        const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+        const ai = new GoogleGenAI({ apiKey });
 
         const allImages = [
             {
@@ -88,13 +88,13 @@ export async function generateInpaintedImage(
 }
 
 export async function enhancePrompt(
+    apiKey: string,
     base64ImageData: string,
     mimeType: string,
     userHint: string
 ): Promise<string> {
     try {
-        // FIX: Always use new GoogleGenAI({ apiKey: process.env.API_KEY }) directly as per guidelines.
-        const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+        const ai = new GoogleGenAI({ apiKey });
         const model = 'gemini-3-flash-preview';
 
         const systemInstruction = `You are an expert prompt engineer. Improve the user's hint for AI image generation. Return ONLY the enhanced prompt.`;
