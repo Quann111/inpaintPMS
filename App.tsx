@@ -67,10 +67,14 @@ const App: React.FC = () => {
     const [model, setModel] = useState<ModelType>('gemini-2.5-flash-image');
     const [imageSize, setImageSize] = useState<ImageSize>('1K');
     const [apiKey, setApiKey] = useState<string>(() => {
+        // Fallback to build-time secret if available first
+        const buildTimeSecret = (process.env.GEMINI_API_KEY as string);
+        if (buildTimeSecret) return buildTimeSecret;
+        
         const storedKey = localStorage.getItem('GEMINI_API_KEY');
         if (storedKey) return storedKey;
-        // Fallback to build-time secret if available
-        return (process.env.GEMINI_API_KEY as string) || '';
+        
+        return '';
     });
 
     useEffect(() => {
