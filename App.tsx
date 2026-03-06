@@ -66,10 +66,15 @@ const App: React.FC = () => {
 
     const [model, setModel] = useState<ModelType>('gemini-2.5-flash-image');
     const [imageSize, setImageSize] = useState<ImageSize>('1K');
-    const [apiKey, setApiKey] = useState<string>(() => localStorage.getItem('GEMINI_API_KEY') || '');
+    const [apiKey, setApiKey] = useState<string>(() => {
+        const storedKey = localStorage.getItem('GEMINI_API_KEY');
+        if (storedKey) return storedKey;
+        // Fallback to build-time secret if available
+        return (process.env.GEMINI_API_KEY as string) || '';
+    });
 
     useEffect(() => {
-        localStorage.setItem('GEMINI_API_KEY', apiKey);
+        if (apiKey) localStorage.setItem('GEMINI_API_KEY', apiKey);
     }, [apiKey]);
 
     const [preFullscreenState, setPreFullscreenState] = useState<{
