@@ -1,0 +1,5 @@
+{
+  "name": "AI Inpainter_PUBLISH",
+  "description": "An advanced image editing application that allows users to mask a selected area of an image, which is then intelligently cropped and regenerated using a text prompt via the Gemini API. The final result is seamlessly stitched back into the original image, preserving its dimensions and quality.",
+  "requestFramePermissions": []
+}
