@@ -4,7 +4,7 @@ import { ImageEditor } from './components/ImageEditor';
 import { Controls } from './components/Controls';
 import { ResultDisplay } from './components/ResultDisplay';
 import { generateInpaintedImage, enhancePrompt } from './services/geminiService';
-import { prepareImageForGemini, stitchImage } from './utils/imageUtils';
+import { prepareImageForGemini, stitchImage, upscaleImageFileToMaxDimension } from './utils/imageUtils';
 import type { MaskData, FocusData, BoundingBox, StitchMethod, BrushMode, ModelType, ImageSize, AspectRatio } from './types';
 import { Header } from './components/Header';
 import { PaintBrushIcon, RefreshIcon, XMarkIcon, BoxIcon, ExpandIcon, EraserIcon, DownloadIcon, CompareIcon } from './components/icons';
@@ -31,6 +31,8 @@ const App: React.FC = () => {
     const [isStitching, setIsStitching] = useState<boolean>(false);
     const [isEnhancingPrompt, setIsEnhancingPrompt] = useState<boolean>(false);
     const [error, setError] = useState<string | null>(null);
+    const [notice, setNotice] = useState<string | null>(null);
+    const [shouldUpscaleResultTo4K, setShouldUpscaleResultTo4K] = useState<boolean>(false);
     const [brushSize, setBrushSize] = useState<number>(40);
     const [focusData, setFocusData] = useState<FocusData | null>(null);
     const [userDefinedBox, setUserDefinedBox] = useState<BoundingBox | null>(null);
@@ -66,14 +68,7 @@ const App: React.FC = () => {
 
     const [model, setModel] = useState<ModelType>('gemini-2.5-flash-image');
     const [imageSize, setImageSize] = useState<ImageSize>('1K');
-    const [apiKey, setApiKey] = useState<string>(() => {
-        const storedKey = localStorage.getItem('GEMINI_API_KEY');
-        return storedKey || '';
-    });
-
-    useEffect(() => {
-        if (apiKey) localStorage.setItem('GEMINI_API_KEY', apiKey);
-    }, [apiKey]);
+    const [apiKey, setApiKey] = useState<string>('');
 
     const [preFullscreenState, setPreFullscreenState] = useState<{
         maskData: MaskData | null;
@@ -308,8 +303,26 @@ const App: React.FC = () => {
             if (!hasKey) await handleOpenApiKeyDialog();
         }
 
+        const isOverloadedError = (err: unknown) => {
+            const e = err as any;
+            const msg = typeof e?.message === 'string' ? e.message : String(err);
+            const status = typeof e?.status === 'string' ? e.status : '';
+            const code = typeof e?.code === 'number' ? e.code : undefined;
+
+            return (
+                code === 503 ||
+                status === 'UNAVAILABLE' ||
+                msg.includes('high demand') ||
+                msg.includes('UNAVAILABLE') ||
+                msg.includes('"code":503') ||
+                msg.includes('503')
+            );
+        };
+
         setIsLoading(true);
         setError(null);
+        setNotice(null);
+        setShouldUpscaleResultTo4K(false);
         
         try {
             const { preparedImageBase64, mimeType, focusData: newFocusData, aspectRatio } = await prepareImageForGemini(originalImage, maskData, userDefinedBox, maskOpacity);
@@ -329,29 +342,58 @@ const App: React.FC = () => {
 
             if (!apiKey && model !== 'gemini-3-pro-image-preview') {
                 setError('Please enter your Gemini API Key first.');
-                setIsLoading(false);
                 return;
             }
 
-            const result = await generateInpaintedImage(
-                apiKey,
-                preparedImageBase64, 
-                mimeType, 
-                prompt, 
-                !!maskData?.hasDrawing, 
-                processedRefImages, 
-                model,
-                aspectRatio,
-                imageSize
-            );
+            const requested4K = model === 'gemini-3-pro-image-preview' && imageSize === '4K';
+            const runGenerate = (size: ImageSize) =>
+                generateInpaintedImage(
+                    apiKey,
+                    preparedImageBase64,
+                    mimeType,
+                    prompt,
+                    !!maskData?.hasDrawing,
+                    processedRefImages,
+                    model,
+                    aspectRatio,
+                    size
+                );
+
+            let result: string;
+            try {
+                result = await runGenerate(imageSize);
+            } catch (err) {
+                if (requested4K && isOverloadedError(err)) {
+                    try {
+                        setNotice('4K đang quá tải (503). Tự động chuyển sang 2K và sẽ upscale lên 4K khi Stitch.');
+                        result = await runGenerate('2K');
+                        setShouldUpscaleResultTo4K(true);
+                    } catch (err2) {
+                        if (isOverloadedError(err2)) {
+                            setNotice('4K/2K đang quá tải (503). Tự động chuyển sang 1K và sẽ upscale lên 4K khi Stitch.');
+                            result = await runGenerate('1K');
+                            setShouldUpscaleResultTo4K(true);
+                        } else {
+                            const msg = err2 instanceof Error ? err2.message : String(err2);
+                            setError(msg || 'Generation failed.');
+                            return;
+                        }
+                    }
+                } else if (isOverloadedError(err)) {
+                    setError('Model đang quá tải (503). Hãy thử lại sau, hoặc giảm xuống 2K/1K.');
+                    return;
+                } else {
+                    const msg = err instanceof Error ? err.message : String(err);
+                    setError(msg || 'Generation failed.');
+                    return;
+                }
+            }
             
             setGeneratedFocusImage(`data:image/png;base64,${result}`);
             // Reset focus mask when new content generated
             setFocusMaskData(null);
             setFocusMaskHistory([]);
             setFocusMaskHistoryIndex(-1);
-        } catch (err) {
-            setError(err instanceof Error ? err.message : 'Generation failed.');
         } finally {
             setIsLoading(false);
         }
@@ -371,13 +413,14 @@ const App: React.FC = () => {
                 stitchBlur,
                 focusMaskData // Added focus specific mask
             );
-            setInpaintedImageFile(result);
+            const finalResult = shouldUpscaleResultTo4K ? await upscaleImageFileToMaxDimension(result, 4096) : result;
+            setInpaintedImageFile(finalResult);
             if (inpaintedImageUrl) URL.revokeObjectURL(inpaintedImageUrl);
-            setInpaintedImageUrl(URL.createObjectURL(result));
+            setInpaintedImageUrl(URL.createObjectURL(finalResult));
         } finally {
             setIsStitching(false);
         }
-    }, [originalImage, generatedFocusImage, focusData, maskData, stitchMethod, stitchExpansion, stitchBlur, inpaintedImageUrl, focusMaskData]);
+    }, [originalImage, generatedFocusImage, focusData, maskData, stitchMethod, stitchExpansion, stitchBlur, inpaintedImageUrl, focusMaskData, shouldUpscaleResultTo4K]);
 
     const handleEnhancePrompt = useCallback(async () => {
         if (!originalImage) return;
@@ -459,6 +502,7 @@ const App: React.FC = () => {
                             </div>
                         </div>
                         {error && <div className="text-red-400 bg-red-900/50 p-4 rounded-lg">{error}</div>}
+                        {notice && <div className="text-cyan-200 bg-cyan-900/30 p-4 rounded-lg">{notice}</div>}
                         <ResultDisplay inpaintedImage={inpaintedImageUrl} placeholder="Final image will appear here"/>
                     </div>
 

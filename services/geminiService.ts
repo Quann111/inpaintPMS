@@ -3,6 +3,23 @@ import { GoogleGenAI, Modality } from '@google/genai';
 import type { GenerateContentResponse } from '@google/genai';
 import type { ModelType, ImageSize, AspectRatio } from '../types';
 
+const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
+
+const isOverloaded503 = (error: unknown) => {
+    const e = error as any;
+    const msg = typeof e?.message === 'string' ? e.message : '';
+    const status = typeof e?.status === 'string' ? e.status : '';
+    const code = typeof e?.code === 'number' ? e.code : undefined;
+
+    return (
+        code === 503 ||
+        status === 'UNAVAILABLE' ||
+        msg.includes('high demand') ||
+        msg.includes('UNAVAILABLE') ||
+        msg.includes('"code":503')
+    );
+};
+
 export async function generateInpaintedImage(
     apiKey: string,
     base64ImageData: string,
@@ -56,7 +73,7 @@ export async function generateInpaintedImage(
             config.imageConfig.imageSize = imageSize;
         }
 
-        const response: GenerateContentResponse = await ai.models.generateContent({
+        const request = {
             model: model,
             contents: {
                 parts: [
@@ -65,24 +82,43 @@ export async function generateInpaintedImage(
                 ],
             },
             config: config,
-        });
+        };
 
-        const candidate = response.candidates?.[0];
-        
-        if (!candidate) {
-            throw new Error("No image was generated. Check safety policies.");
-        }
+        const maxRetries = model === 'gemini-3-pro-image-preview' && imageSize === '4K' ? 1 : 3;
+        for (let attempt = 0; attempt <= maxRetries; attempt++) {
+            try {
+                const response: GenerateContentResponse = await ai.models.generateContent(request);
 
-        for (const part of candidate.content?.parts || []) {
-            if (part.inlineData?.data) {
-                return part.inlineData.data;
+                const candidate = response.candidates?.[0];
+                if (!candidate) {
+                    throw new Error('No image was generated. Check safety policies.');
+                }
+
+                for (const part of candidate.content?.parts || []) {
+                    if (part.inlineData?.data) {
+                        return part.inlineData.data;
+                    }
+                }
+
+                throw new Error('No image data found in response.');
+            } catch (error) {
+                if (!isOverloaded503(error) || attempt === maxRetries) {
+                    throw error;
+                }
+
+                const base = 600;
+                const backoff = Math.min(8000, base * Math.pow(2, attempt));
+                const jitter = Math.floor(Math.random() * 250);
+                await sleep(backoff + jitter);
             }
         }
-        
-        throw new Error("No image data found in response.");
+
+        throw new Error('Generation failed after retries.');
 
     } catch (error) {
-        console.error("Gemini API Error:", error);
+        if (!isOverloaded503(error)) {
+            console.error("Gemini API Error:", error);
+        }
         throw error;
     }
 }
@@ -99,7 +135,7 @@ export async function enhancePrompt(
 
         const systemInstruction = `You are an expert prompt engineer. Improve the user's hint for AI image generation. Return ONLY the enhanced prompt.`;
         
-        const response = await ai.models.generateContent({
+        const request = {
             model,
             contents: {
                 parts: [
@@ -110,9 +146,26 @@ export async function enhancePrompt(
             config: {
                 systemInstruction: systemInstruction,
             }
-        });
+        };
 
-        return response.text?.trim() || userHint;
+        const maxRetries = 2;
+        for (let attempt = 0; attempt <= maxRetries; attempt++) {
+            try {
+                const response = await ai.models.generateContent(request);
+                return response.text?.trim() || userHint;
+            } catch (error) {
+                if (!isOverloaded503(error) || attempt === maxRetries) {
+                    return userHint;
+                }
+
+                const base = 400;
+                const backoff = Math.min(4000, base * Math.pow(2, attempt));
+                const jitter = Math.floor(Math.random() * 250);
+                await sleep(backoff + jitter);
+            }
+        }
+
+        return userHint;
     } catch (error) {
         return userHint;
     }

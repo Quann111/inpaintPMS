@@ -22,15 +22,15 @@ export const Header: React.FC<HeaderProps> = ({
     onImageSizeChange, 
     isBusy,
 }) => {
+    const logoUrl = new URL('../images.jfif', import.meta.url).href;
+
     return (
         <header className="w-full bg-slate-800 border-b border-slate-700 p-3 shadow-md flex justify-between items-center sticky top-0 z-40">
             <div className="flex items-center gap-3">
-                 <div className="w-8 h-8 bg-gradient-to-br from-cyan-400 to-blue-600 rounded-lg shadow-lg flex items-center justify-center">
-                    <span className="text-white font-bold text-lg">G</span>
-                 </div>
-                 <h1 className="text-xl font-bold text-slate-100 tracking-tight hidden lg:block">
-                    Gemini <span className="text-cyan-400">Inpainter</span>
-                 </h1>
+                <img src={logoUrl} alt="H20 VR" className="w-8 h-8 rounded-lg shadow-lg object-cover" />
+                <h1 className="text-xl font-bold text-slate-100 tracking-tight hidden lg:block">
+                    <span className="text-cyan-400">Inpainter</span>
+                </h1>
             </div>
 
             <div className="flex items-center gap-4 ml-auto">
@@ -49,25 +49,7 @@ export const Header: React.FC<HeaderProps> = ({
 
             {/* Credit Section - Aligned Right */}
             <div className="hidden xl:flex items-center gap-3 text-xs text-swiss-text-muted ml-6 mr-6">
-                <span>Phát triển bởi <a href="https://baoanh-nguyen.id.vn" target="_blank" rel="noopener noreferrer" className="text-swiss-text-muted hover:text-cyan-400 transition-colors" title="Website">Bảo Anh Nguyễn</a></span>
-                <div className="flex items-center gap-2 border-l border-swiss-border pl-3">
-                    <span className="text-swiss-text-muted text-xs">Liên hệ:</span>
-                    <a href="https://baoanh-nguyen.id.vn" target="_blank" rel="noopener noreferrer" className="text-swiss-text-muted hover:text-cyan-400 transition-colors" title="Website">
-                        <GlobeIcon className="w-4 h-4" />
-                    </a>
-                    <a href="https://www.linkedin.com/in/baoanhnguyenarc/" target="_blank" rel="noopener noreferrer" className="text-swiss-text-muted hover:text-cyan-400 transition-colors" title="LinkedIn">
-                        <LinkedInIcon className="w-4 h-4" />
-                    </a>
-                    <a href="https://www.facebook.com/banhbanh.nguyen" target="_blank" rel="noopener noreferrer" className="text-swiss-text-muted hover:text-cyan-400 transition-colors" title="Facebook">
-                        <FacebookIcon className="w-4 h-4" />
-                    </a>
-                    <a href="mailto:baoanhnguyen.kts@gmail.com" className="text-swiss-text-muted hover:text-cyan-400 transition-colors" title="Email">
-                        <EnvelopeIcon className="w-4 h-4" />
-                    </a>
-                    <button className="text-swiss-text-muted hover:text-cyan-400 transition-colors" title="Zalo">
-                        <ZaloIcon className="w-4 h-4" />
-                    </button>
-                </div>
+                <span>Phát triển bởi <a href="https://baoanh-nguyen.id.vn" target="_blank" rel="noopener noreferrer" className="text-swiss-text-muted hover:text-cyan-400 transition-colors" title="Website">H20 VR.</a></span>
             </div>
 
             <div className="flex items-center gap-2">

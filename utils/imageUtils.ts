@@ -95,6 +95,50 @@ async function fileToImage(file: File): Promise<HTMLImageElement> {
     });
 }
 
+export async function upscaleImageFileToMaxDimension(
+    imageFile: File,
+    maxDimension: number = 4096,
+    mimeType: string = 'image/jpeg',
+    quality: number = 0.95
+): Promise<File> {
+    const img = await fileToImage(imageFile);
+    const currentMax = Math.max(img.width, img.height);
+
+    if (currentMax >= maxDimension) return imageFile;
+
+    const scale = maxDimension / currentMax;
+    const targetWidth = Math.round(img.width * scale);
+    const targetHeight = Math.round(img.height * scale);
+
+    const canvas = document.createElement('canvas');
+    canvas.width = targetWidth;
+    canvas.height = targetHeight;
+
+    const ctx = canvas.getContext('2d');
+    if (!ctx) throw new Error('Could not get canvas context');
+
+    ctx.imageSmoothingEnabled = true;
+    (ctx as any).imageSmoothingQuality = 'high';
+    ctx.drawImage(img, 0, 0, targetWidth, targetHeight);
+
+    const baseName = imageFile.name.replace(/\.[^.]+$/, '');
+    const nextName = `${baseName}-${maxDimension}.jpg`;
+
+    return new Promise((resolve, reject) => {
+        canvas.toBlob(
+            (blob) => {
+                if (blob) {
+                    resolve(new File([blob], nextName, { type: mimeType }));
+                } else {
+                    reject(new Error('Failed to convert canvas to Blob.'));
+                }
+            },
+            mimeType,
+            quality
+        );
+    });
+}
+
 export async function prepareImageForGemini(
     imageFile: File,
     maskData: MaskData | null,
