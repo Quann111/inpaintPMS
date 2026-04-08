@@ -1,7 +1,7 @@
 
-import { GoogleGenAI, Modality } from '@google/genai';
+import { GoogleGenAI } from '@google/genai';
 import type { GenerateContentResponse } from '@google/genai';
-import type { ModelType, ImageSize, AspectRatio } from '../types';
+import type { ModelType, ImageSize, AspectRatio, ApiResponse } from '../types';
 
 const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 
@@ -20,6 +20,152 @@ const isOverloaded503 = (error: unknown) => {
     );
 };
 
+/**
+ * Chuyển đổi base64 thành Blob
+ */
+function base64ToBlob(base64: string, mimeType: string): Blob {
+    const byteCharacters = atob(base64);
+    const byteNumbers = new Array(byteCharacters.length);
+    for (let i = 0; i < byteCharacters.length; i++) {
+        byteNumbers[i] = byteCharacters.charCodeAt(i);
+    }
+    const byteArray = new Uint8Array(byteNumbers);
+    return new Blob([byteArray], { type: mimeType });
+}
+
+function blobToDataUrl(blob: Blob): Promise<string> {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onloadend = () => resolve(reader.result as string);
+        reader.onerror = reject;
+        reader.readAsDataURL(blob);
+    });
+}
+
+async function fetchAsDataUrl(url: string): Promise<string> {
+    const rewrittenUrl = url.startsWith('https://api.tramsangtao.com')
+        ? url.replace('https://api.tramsangtao.com', '/api-tramsangtao')
+        : url.startsWith('https://cdn.tramsangtao.com')
+            ? url.replace('https://cdn.tramsangtao.com', '/cdn-tramsangtao')
+            : url.startsWith('https://storage.googleapis.com/')
+                ? url.replace('https://storage.googleapis.com', '/gcs')
+                : url;
+
+    const res = await fetch(rewrittenUrl);
+    if (!res.ok) throw new Error(`Download result failed: ${res.status}`);
+    const blob = await res.blob();
+    return blobToDataUrl(blob);
+}
+
+/**
+ * Gọi API tramsangtao.com để tạo ảnh
+ */
+async function generateWithNanoBanana(
+    apiKey: string,
+    base64ImageData: string,
+    mimeType: string,
+    prompt: string,
+    aspectRatio: AspectRatio = '16:9',
+    imageSize: ImageSize = '2k',
+    model: 'nano-banana' | 'nano-banana-pro' = 'nano-banana'
+): Promise<string> {
+    const endpoint = '/api-tramsangtao/v1/image/generate';
+    const hasInputImage = !!base64ImageData;
+
+    const response = hasInputImage
+        ? await (async () => {
+            const formData = new FormData();
+            formData.append('prompt', prompt);
+            formData.append('model', model);
+            if (model === 'nano-banana-pro') {
+                formData.append('resolution', imageSize);
+            }
+            formData.append('aspect_ratio', aspectRatio);
+            formData.append('speed', 'fast');
+
+            const blob = base64ToBlob(base64ImageData, mimeType);
+            formData.append('input_image', blob, `input.${mimeType.split('/')[1]}`);
+
+            return fetch(endpoint, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${apiKey}`
+                },
+                body: formData
+            });
+        })()
+        : await fetch(endpoint, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${apiKey}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                prompt,
+                model,
+                aspect_ratio: aspectRatio,
+                speed: 'fast',
+                ...(model === 'nano-banana-pro' ? { resolution: imageSize } : {}),
+            })
+        });
+
+    if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.message || `API Error: ${response.status}`);
+    }
+
+    const data: ApiResponse = await response.json();
+
+    const immediateResult = (data as any).result_url ?? (data as any).result;
+    if (typeof immediateResult === 'string' && immediateResult) {
+        const dataUrl = await fetchAsDataUrl(immediateResult);
+        return dataUrl.includes(',') ? dataUrl.split(',')[1] : dataUrl;
+    }
+
+    return pollJobResult(apiKey, data.job_id);
+}
+
+async function pollJobResult(apiKey: string, jobId: string): Promise<string> {
+    const maxAttempts = 60;
+
+    for (let attempt = 0; attempt < maxAttempts; attempt++) {
+        const response = await fetch(`/api-tramsangtao/v1/jobs/${encodeURIComponent(jobId)}`, {
+            headers: {
+                'Authorization': `Bearer ${apiKey}`
+            }
+        });
+
+        if (response.status === 404) {
+            await sleep(2000);
+            continue;
+        }
+
+        if (!response.ok) {
+            throw new Error(`Status check failed: ${response.status}`);
+        }
+
+        const payload = await response.json().catch(() => ({}));
+        const status = typeof payload?.status === 'string' ? payload.status.toLowerCase() : '';
+        const result = payload?.result;
+
+        if (status === 'completed') {
+            if (typeof result !== 'string' || !result) {
+                throw new Error('Job completed but result is missing.');
+            }
+            const dataUrl = await fetchAsDataUrl(result);
+            return dataUrl.includes(',') ? dataUrl.split(',')[1] : dataUrl;
+        }
+
+        if (status === 'failed' || status === 'error') {
+            throw new Error('Image generation failed on server.');
+        }
+
+        await sleep(5000);
+    }
+
+    throw new Error('Job timeout.');
+}
+
 export async function generateInpaintedImage(
     apiKey: string,
     base64ImageData: string,
@@ -29,8 +175,14 @@ export async function generateInpaintedImage(
     referenceImages: { base64: string; mimeType: string }[] = [],
     model: ModelType = 'gemini-2.5-flash-image',
     aspectRatio: AspectRatio = '1:1',
-    imageSize: ImageSize = '1K'
+    imageSize: ImageSize = '1k'
 ): Promise<string> {
+    // Nếu sử dụng model mới nano-banana hoặc nano-banana-pro
+    if (model === 'nano-banana-pro' || model === 'nano-banana') {
+        return generateWithNanoBanana(apiKey, base64ImageData, mimeType, prompt, aspectRatio, imageSize, model);
+    }
+
+    // Logic cũ cho Gemini
     try {
         const ai = new GoogleGenAI({ apiKey });
 
@@ -70,7 +222,7 @@ export async function generateInpaintedImage(
 
         // Only Pro supports imageSize
         if (model === 'gemini-3-pro-image-preview') {
-            config.imageConfig.imageSize = imageSize;
+            config.imageConfig.imageSize = imageSize.toUpperCase() as any;
         }
 
         const request = {
@@ -84,7 +236,7 @@ export async function generateInpaintedImage(
             config: config,
         };
 
-        const maxRetries = model === 'gemini-3-pro-image-preview' && imageSize === '4K' ? 1 : 3;
+        const maxRetries = model === 'gemini-3-pro-image-preview' && imageSize === '4k' ? 1 : 3;
         for (let attempt = 0; attempt <= maxRetries; attempt++) {
             try {
                 const response: GenerateContentResponse = await ai.models.generateContent(request);

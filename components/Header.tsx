@@ -38,7 +38,7 @@ export const Header: React.FC<HeaderProps> = ({
                     <KeyIcon className="w-4 h-4 text-slate-500 ml-1" />
                     <input
                         type="password"
-                        placeholder="Enter API Key..."
+                        placeholder={(model === 'nano-banana-pro' || model === 'nano-banana') ? "Enter Banana API Key (sk_...)" : "Enter Gemini API Key..."}
                         value={apiKey}
                         onChange={(e) => onApiKeyChange(e.target.value)}
                         disabled={isBusy}
@@ -53,17 +53,17 @@ export const Header: React.FC<HeaderProps> = ({
             </div>
 
             <div className="flex items-center gap-2">
-                {/* Resolution Config (Pro Only) */}
-                {model === 'gemini-3-pro-image-preview' && (
+                {/* Resolution Config */}
+                {(model === 'gemini-3-pro-image-preview' || model === 'nano-banana-pro') && (
                     <div className="flex bg-slate-900/80 rounded-lg p-0.5 border border-slate-600 mr-2">
-                        {(['1K', '2K', '4K'] as ImageSize[]).map((size) => (
+                        {(['1k', '2k', '4k'] as ImageSize[]).map((size) => (
                             <button 
                                 key={size} 
                                 onClick={() => onImageSizeChange(size)} 
                                 disabled={isBusy} 
-                                className={`px-2 py-1 text-[10px] font-bold rounded-md transition-all ${imageSize === size ? 'bg-indigo-600 text-white' : 'text-slate-400 hover:text-slate-200'}`}
+                                className={`px-2 py-1 text-[10px] font-bold rounded-md transition-all ${imageSize.toLowerCase() === size.toLowerCase() ? 'bg-indigo-600 text-white' : 'text-slate-400 hover:text-slate-200'}`}
                             >
-                                {size}
+                                {size.toUpperCase()}
                             </button>
                         ))}
                     </div>
@@ -84,6 +84,20 @@ export const Header: React.FC<HeaderProps> = ({
                         className={`px-3 py-1.5 text-xs font-bold rounded-md transition-all ${model === 'gemini-3-pro-image-preview' ? 'bg-cyan-600 text-white' : 'text-slate-500 hover:text-slate-300'}`}
                     >
                         Pro
+                    </button>
+                    <button 
+                        onClick={() => onModelChange('nano-banana-pro')} 
+                        disabled={isBusy} 
+                        className={`px-3 py-1.5 text-xs font-bold rounded-md transition-all ${model === 'nano-banana-pro' ? 'bg-yellow-600 text-white' : 'text-slate-500 hover:text-slate-300'}`}
+                    >
+                        Banana Pro
+                    </button>
+                    <button 
+                        onClick={() => onModelChange('nano-banana')} 
+                        disabled={isBusy} 
+                        className={`px-3 py-1.5 text-xs font-bold rounded-md transition-all ${model === 'nano-banana' ? 'bg-green-600 text-white' : 'text-slate-500 hover:text-slate-300'}`}
+                    >
+                        Banana
                     </button>
                 </div>
             </div>

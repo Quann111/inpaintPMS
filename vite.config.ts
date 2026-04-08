@@ -10,6 +10,23 @@ export default defineConfig(() => {
       server: {
         port: 5173,
         host: '0.0.0.0',
+        proxy: {
+          '/api-tramsangtao': {
+            target: 'https://api.tramsangtao.com',
+            changeOrigin: true,
+            rewrite: (path) => path.replace(/^\/api-tramsangtao/, '')
+          },
+          '/gcs': {
+            target: 'https://storage.googleapis.com',
+            changeOrigin: true,
+            rewrite: (path) => path.replace(/^\/gcs/, '')
+          },
+          '/cdn-tramsangtao': {
+            target: 'https://cdn.tramsangtao.com',
+            changeOrigin: true,
+            rewrite: (path) => path.replace(/^\/cdn-tramsangtao/, '')
+          }
+        }
       },
       plugins: [react()],
       resolve: {

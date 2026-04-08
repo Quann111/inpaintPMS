@@ -24,6 +24,23 @@ export type StitchMethod = 'mask' | 'boundingBox';
 export type BrushMode = 'draw' | 'erase';
 
 // Added missing exported types for model configuration, image size, and aspect ratios
-export type ModelType = 'gemini-2.5-flash-image' | 'gemini-3-pro-image-preview';
-export type ImageSize = '1K' | '2K' | '4K';
-export type AspectRatio = '1:1' | '3:4' | '4:3' | '9:16' | '16:9';
+export type ModelType = 'gemini-2.5-flash-image' | 'gemini-3-pro-image-preview' | 'nano-banana-pro' | 'nano-banana';
+export type ImageSize = '1k' | '2k' | '4k';
+export type AspectRatio = 'auto' | '1:1' | '4:3' | '16:9' | '21:9' | '5:4' | '3:2' | '2:3' | '9:16' | '3:4' | '4:5';
+
+export interface ApiResponse {
+    job_id: string;
+    status: string;
+    cost: number;
+    balance_remaining: number;
+    result_url?: string; // Giả định API sẽ trả về URL kết quả sau khi hoàn thành
+}
+
+declare global {
+    interface Window {
+        aistudio?: {
+            openSelectKey: () => Promise<void>;
+            hasSelectedApiKey: () => Promise<boolean>;
+        };
+    }
+}

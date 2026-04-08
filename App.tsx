@@ -66,8 +66,9 @@ const App: React.FC = () => {
     const [referenceImages, setReferenceImages] = useState<ReferenceImage[]>([]);
     const [isRefImagesCollapsed, setIsRefImagesCollapsed] = useState<boolean>(true);
 
-    const [model, setModel] = useState<ModelType>('gemini-2.5-flash-image');
-    const [imageSize, setImageSize] = useState<ImageSize>('1K');
+    const [model, setModel] = useState<ModelType>('nano-banana');
+    const [imageSize, setImageSize] = useState<ImageSize>('2k');
+    const [aspectRatio, setAspectRatio] = useState<AspectRatio>('16:9');
     const [apiKey, setApiKey] = useState<string>('');
 
     const [preFullscreenState, setPreFullscreenState] = useState<{
@@ -341,11 +342,11 @@ const App: React.FC = () => {
             }));
 
             if (!apiKey && model !== 'gemini-3-pro-image-preview') {
-                setError('Please enter your Gemini API Key first.');
+                setError(model === 'nano-banana' || model === 'nano-banana-pro' ? 'Vui lòng nhập Banana API Key trước.' : 'Please enter your Gemini API Key first.');
                 return;
             }
 
-            const requested4K = model === 'gemini-3-pro-image-preview' && imageSize === '4K';
+            const requested4K = (model === 'gemini-3-pro-image-preview' || model === 'nano-banana-pro') && imageSize === '4k';
             const runGenerate = (size: ImageSize) =>
                 generateInpaintedImage(
                     apiKey,
@@ -365,13 +366,13 @@ const App: React.FC = () => {
             } catch (err) {
                 if (requested4K && isOverloadedError(err)) {
                     try {
-                        setNotice('4K đang quá tải (503). Tự động chuyển sang 2K và sẽ upscale lên 4K khi Stitch.');
-                        result = await runGenerate('2K');
+                        setNotice(`${imageSize.toUpperCase()} đang quá tải. Tự động chuyển sang 2K.`);
+                        result = await runGenerate('2k');
                         setShouldUpscaleResultTo4K(true);
                     } catch (err2) {
                         if (isOverloadedError(err2)) {
-                            setNotice('4K/2K đang quá tải (503). Tự động chuyển sang 1K và sẽ upscale lên 4K khi Stitch.');
-                            result = await runGenerate('1K');
+                            setNotice(`${imageSize.toUpperCase()}/2K đang quá tải. Tự động chuyển sang 1K.`);
+                            result = await runGenerate('1k');
                             setShouldUpscaleResultTo4K(true);
                         } else {
                             const msg = err2 instanceof Error ? err2.message : String(err2);
@@ -379,9 +380,6 @@ const App: React.FC = () => {
                             return;
                         }
                     }
-                } else if (isOverloadedError(err)) {
-                    setError('Model đang quá tải (503). Hãy thử lại sau, hoặc giảm xuống 2K/1K.');
-                    return;
                 } else {
                     const msg = err instanceof Error ? err.message : String(err);
                     setError(msg || 'Generation failed.');
@@ -389,7 +387,8 @@ const App: React.FC = () => {
                 }
             }
             
-            setGeneratedFocusImage(`data:image/png;base64,${result}`);
+            const nextFocusImage = result.startsWith('data:') ? result : `data:image/png;base64,${result}`;
+            setGeneratedFocusImage(nextFocusImage);
             // Reset focus mask when new content generated
             setFocusMaskData(null);
             setFocusMaskHistory([]);
@@ -424,11 +423,17 @@ const App: React.FC = () => {
 
     const handleEnhancePrompt = useCallback(async () => {
         if (!originalImage) return;
+        
+        if (model === 'nano-banana-pro' || model === 'nano-banana') {
+            setNotice('Tính năng "Enhance Prompt" hiện chỉ hỗ trợ với Gemini API Key. Vui lòng nhập Gemini Key nếu muốn sử dụng.');
+            return;
+        }
+
         setIsEnhancingPrompt(true);
         try {
             const { preparedImageBase64, mimeType } = await prepareImageForGemini(originalImage, maskData, userDefinedBox, maskOpacity);
-            if (!apiKey && model !== 'gemini-3-pro-image-preview') {
-                setError('Please enter your Gemini API Key first.');
+            if (!apiKey) {
+                setError('Vui lòng nhập Gemini API Key để sử dụng tính năng này.');
                 setIsEnhancingPrompt(false);
                 return;
             }
@@ -437,7 +442,7 @@ const App: React.FC = () => {
         } finally {
             setIsEnhancingPrompt(false);
         }
-    }, [originalImage, maskData, userDefinedBox, prompt, maskOpacity, apiKey]);
+    }, [originalImage, maskData, userDefinedBox, prompt, maskOpacity, apiKey, model]);
 
     const isBusy = isLoading || isStitching || isEnhancingPrompt;
     const canCompare = !!preparedImage && !!generatedFocusImage;
