@@ -98,42 +98,51 @@ async function generateWithNanoBanana(
             : 'https://api.tramsangtao.com/v1/image/generate';
     const hasInputImage = !!base64ImageData;
 
-    const response = hasInputImage
-        ? await (async () => {
-            const formData = new FormData();
-            formData.append('prompt', prompt);
-            formData.append('model', model);
-            if (model === 'nano-banana-pro') {
-                formData.append('resolution', imageSize);
-            }
-            formData.append('aspect_ratio', aspectRatio);
-            formData.append('speed', 'fast');
+    let response: Response;
+    try {
+        response = hasInputImage
+            ? await (async () => {
+                const formData = new FormData();
+                formData.append('prompt', prompt);
+                formData.append('model', model);
+                if (model === 'nano-banana-pro') {
+                    formData.append('resolution', imageSize);
+                }
+                formData.append('aspect_ratio', aspectRatio);
+                formData.append('speed', 'fast');
 
-            const blob = base64ToBlob(base64ImageData, mimeType);
-            formData.append('input_image', blob, `input.${mimeType.split('/')[1]}`);
+                const blob = base64ToBlob(base64ImageData, mimeType);
+                formData.append('input_image', blob, `input.${mimeType.split('/')[1]}`);
 
-            return fetch(endpoint, {
+                return fetch(endpoint, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${apiKey}`
+                    },
+                    body: formData
+                });
+            })()
+            : await fetch(endpoint, {
                 method: 'POST',
                 headers: {
-                    'Authorization': `Bearer ${apiKey}`
+                    'Authorization': `Bearer ${apiKey}`,
+                    'Content-Type': 'application/json'
                 },
-                body: formData
+                body: JSON.stringify({
+                    prompt,
+                    model,
+                    aspect_ratio: aspectRatio,
+                    speed: 'fast',
+                    ...(model === 'nano-banana-pro' ? { resolution: imageSize } : {}),
+                })
             });
-        })()
-        : await fetch(endpoint, {
-            method: 'POST',
-            headers: {
-                'Authorization': `Bearer ${apiKey}`,
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-                prompt,
-                model,
-                aspect_ratio: aspectRatio,
-                speed: 'fast',
-                ...(model === 'nano-banana-pro' ? { resolution: imageSize } : {}),
-            })
-        });
+    } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        if (!isDev && !proxyBase) {
+            throw new Error(`Failed to fetch. Trình duyệt đang chặn CORS khi gọi api.tramsangtao.com từ GitHub Pages. Hãy cấu hình Proxy URL (Cloudflare Worker) rồi thử lại. (${msg})`);
+        }
+        throw err;
+    }
 
     if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
@@ -162,11 +171,20 @@ async function pollJobResult(apiKey: string, jobId: string): Promise<string> {
             : isDev
                 ? `/api-tramsangtao/v1/jobs/${encodeURIComponent(jobId)}`
                 : `https://api.tramsangtao.com/v1/jobs/${encodeURIComponent(jobId)}`;
-        const response = await fetch(url, {
-            headers: {
-                'Authorization': `Bearer ${apiKey}`
+        let response: Response;
+        try {
+            response = await fetch(url, {
+                headers: {
+                    'Authorization': `Bearer ${apiKey}`
+                }
+            });
+        } catch (err) {
+            const msg = err instanceof Error ? err.message : String(err);
+            if (!isDev && !proxyBase) {
+                throw new Error(`Failed to fetch. Trình duyệt đang chặn CORS khi gọi api.tramsangtao.com từ GitHub Pages. Hãy cấu hình Proxy URL (Cloudflare Worker) rồi thử lại. (${msg})`);
             }
-        });
+            throw err;
+        }
 
         if (response.status === 404) {
             await sleep(2000);
