@@ -136,7 +136,17 @@ const App: React.FC = () => {
 
     useEffect(() => {
         try {
-            localStorage.setItem('TRAM_PROXY_BASE', tramProxyBase);
+            const v = tramProxyBase.trim();
+            if (!v) {
+                localStorage.removeItem('TRAM_PROXY_BASE');
+                return;
+            }
+            const u = new URL(v);
+            if (u.protocol !== 'https:' && u.protocol !== 'http:') {
+                localStorage.removeItem('TRAM_PROXY_BASE');
+                return;
+            }
+            localStorage.setItem('TRAM_PROXY_BASE', u.toString().replace(/\/+$/, ''));
         } catch {
         }
     }, [tramProxyBase]);

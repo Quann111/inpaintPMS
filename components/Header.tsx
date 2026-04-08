@@ -54,7 +54,7 @@ export const Header: React.FC<HeaderProps> = ({
                         <GlobeIcon className="w-4 h-4 text-slate-500 ml-1" />
                         <input
                             type="text"
-                            placeholder="Proxy URL (optional)"
+                            placeholder="Proxy URL (https://...workers.dev)"
                             value={tramProxyBase}
                             onChange={(e) => onTramProxyBaseChange(e.target.value)}
                             disabled={isBusy}

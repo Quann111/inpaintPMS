@@ -5,15 +5,27 @@ import type { ModelType, ImageSize, AspectRatio, ApiResponse } from '../types';
 
 const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 
+const normalizeProxyBase = (value: string): string => {
+    const v = value.trim().replace(/\/+$/, '');
+    if (!v) return '';
+    try {
+        const u = new URL(v);
+        if (u.protocol !== 'https:' && u.protocol !== 'http:') return '';
+        return u.toString().replace(/\/+$/, '');
+    } catch {
+        return '';
+    }
+};
+
 const getTramProxyBase = (): string => {
     const envVal = (import.meta as any)?.env?.VITE_TRAM_PROXY_BASE;
     if (typeof envVal === 'string' && envVal.trim()) {
-        return envVal.trim().replace(/\/+$/, '');
+        return normalizeProxyBase(envVal);
     }
 
     try {
         const v = localStorage.getItem('TRAM_PROXY_BASE');
-        return typeof v === 'string' && v.trim() ? v.trim().replace(/\/+$/, '') : '';
+        return typeof v === 'string' ? normalizeProxyBase(v) : '';
     } catch {
         return '';
     }
