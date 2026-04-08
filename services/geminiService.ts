@@ -5,6 +5,20 @@ import type { ModelType, ImageSize, AspectRatio, ApiResponse } from '../types';
 
 const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 
+const getTramProxyBase = (): string => {
+    const envVal = (import.meta as any)?.env?.VITE_TRAM_PROXY_BASE;
+    if (typeof envVal === 'string' && envVal.trim()) {
+        return envVal.trim().replace(/\/+$/, '');
+    }
+
+    try {
+        const v = localStorage.getItem('TRAM_PROXY_BASE');
+        return typeof v === 'string' && v.trim() ? v.trim().replace(/\/+$/, '') : '';
+    } catch {
+        return '';
+    }
+};
+
 const isOverloaded503 = (error: unknown) => {
     const e = error as any;
     const msg = typeof e?.message === 'string' ? e.message : '';
@@ -44,15 +58,18 @@ function blobToDataUrl(blob: Blob): Promise<string> {
 
 async function fetchAsDataUrl(url: string): Promise<string> {
     const isDev = !!import.meta.env?.DEV;
-    const rewrittenUrl = isDev
-        ? url.startsWith('https://api.tramsangtao.com')
-            ? url.replace('https://api.tramsangtao.com', '/api-tramsangtao')
-            : url.startsWith('https://cdn.tramsangtao.com')
-                ? url.replace('https://cdn.tramsangtao.com', '/cdn-tramsangtao')
-                : url.startsWith('https://storage.googleapis.com/')
-                    ? url.replace('https://storage.googleapis.com', '/gcs')
-                    : url
-        : url;
+    const proxyBase = getTramProxyBase();
+    const rewrittenUrl = proxyBase
+        ? `${proxyBase}/proxy?url=${encodeURIComponent(url)}`
+        : isDev
+            ? url.startsWith('https://api.tramsangtao.com')
+                ? url.replace('https://api.tramsangtao.com', '/api-tramsangtao')
+                : url.startsWith('https://cdn.tramsangtao.com')
+                    ? url.replace('https://cdn.tramsangtao.com', '/cdn-tramsangtao')
+                    : url.startsWith('https://storage.googleapis.com/')
+                        ? url.replace('https://storage.googleapis.com', '/gcs')
+                        : url
+            : url;
 
     const res = await fetch(rewrittenUrl);
     if (!res.ok) throw new Error(`Download result failed: ${res.status}`);
@@ -73,7 +90,12 @@ async function generateWithNanoBanana(
     model: 'nano-banana' | 'nano-banana-pro' = 'nano-banana'
 ): Promise<string> {
     const isDev = !!import.meta.env?.DEV;
-    const endpoint = isDev ? '/api-tramsangtao/v1/image/generate' : 'https://api.tramsangtao.com/v1/image/generate';
+    const proxyBase = getTramProxyBase();
+    const endpoint = proxyBase
+        ? `${proxyBase}/v1/image/generate`
+        : isDev
+            ? '/api-tramsangtao/v1/image/generate'
+            : 'https://api.tramsangtao.com/v1/image/generate';
     const hasInputImage = !!base64ImageData;
 
     const response = hasInputImage
@@ -132,11 +154,14 @@ async function generateWithNanoBanana(
 async function pollJobResult(apiKey: string, jobId: string): Promise<string> {
     const maxAttempts = 60;
     const isDev = !!import.meta.env?.DEV;
+    const proxyBase = getTramProxyBase();
 
     for (let attempt = 0; attempt < maxAttempts; attempt++) {
-        const url = isDev
-            ? `/api-tramsangtao/v1/jobs/${encodeURIComponent(jobId)}`
-            : `https://api.tramsangtao.com/v1/jobs/${encodeURIComponent(jobId)}`;
+        const url = proxyBase
+            ? `${proxyBase}/v1/jobs/${encodeURIComponent(jobId)}`
+            : isDev
+                ? `/api-tramsangtao/v1/jobs/${encodeURIComponent(jobId)}`
+                : `https://api.tramsangtao.com/v1/jobs/${encodeURIComponent(jobId)}`;
         const response = await fetch(url, {
             headers: {
                 'Authorization': `Bearer ${apiKey}`

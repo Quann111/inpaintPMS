@@ -6,6 +6,8 @@ import type { ModelType, ImageSize } from '../types';
 interface HeaderProps {
     apiKey: string;
     onApiKeyChange: (key: string) => void;
+    tramProxyBase: string;
+    onTramProxyBaseChange: (value: string) => void;
     model: ModelType;
     onModelChange: (model: ModelType) => void;
     imageSize: ImageSize;
@@ -16,6 +18,8 @@ interface HeaderProps {
 export const Header: React.FC<HeaderProps> = ({ 
     apiKey,
     onApiKeyChange,
+    tramProxyBase,
+    onTramProxyBaseChange,
     model, 
     onModelChange, 
     imageSize, 
@@ -45,6 +49,19 @@ export const Header: React.FC<HeaderProps> = ({
                         className="bg-transparent text-xs text-slate-200 outline-none w-40 placeholder:text-slate-600"
                     />
                 </div>
+                {(model === 'nano-banana-pro' || model === 'nano-banana') && (
+                    <div className="flex items-center gap-2 bg-slate-900/80 rounded-lg p-1 border border-slate-600">
+                        <GlobeIcon className="w-4 h-4 text-slate-500 ml-1" />
+                        <input
+                            type="text"
+                            placeholder="Proxy URL (optional)"
+                            value={tramProxyBase}
+                            onChange={(e) => onTramProxyBaseChange(e.target.value)}
+                            disabled={isBusy}
+                            className="bg-transparent text-xs text-slate-200 outline-none w-56 placeholder:text-slate-600"
+                        />
+                    </div>
+                )}
             </div>
 
             {/* Credit Section - Aligned Right */}

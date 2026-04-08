@@ -70,6 +70,15 @@ const App: React.FC = () => {
     const [imageSize, setImageSize] = useState<ImageSize>('2k');
     const [aspectRatio, setAspectRatio] = useState<AspectRatio>('16:9');
     const [apiKey, setApiKey] = useState<string>('');
+    const [tramProxyBase, setTramProxyBase] = useState<string>(() => {
+        const fromEnv = (import.meta as any)?.env?.VITE_TRAM_PROXY_BASE;
+        if (typeof fromEnv === 'string' && fromEnv.trim()) return fromEnv.trim();
+        try {
+            return localStorage.getItem('TRAM_PROXY_BASE') || '';
+        } catch {
+            return '';
+        }
+    });
 
     const [preFullscreenState, setPreFullscreenState] = useState<{
         maskData: MaskData | null;
@@ -124,6 +133,13 @@ const App: React.FC = () => {
             if (inpaintedImageUrl) URL.revokeObjectURL(inpaintedImageUrl);
         };
     }, [originalImageUrl, inpaintedImageUrl]);
+
+    useEffect(() => {
+        try {
+            localStorage.setItem('TRAM_PROXY_BASE', tramProxyBase);
+        } catch {
+        }
+    }, [tramProxyBase]);
     
     const resetStateForNewImage = () => {
         setInpaintedImageFile(null);
@@ -456,6 +472,8 @@ const App: React.FC = () => {
             <Header 
                 apiKey={apiKey}
                 onApiKeyChange={setApiKey}
+                tramProxyBase={tramProxyBase}
+                onTramProxyBaseChange={setTramProxyBase}
                 model={model} 
                 onModelChange={setModel} 
                 imageSize={imageSize} 
