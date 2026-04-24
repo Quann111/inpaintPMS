@@ -12,6 +12,7 @@ import { CompareSlider } from './components/CompareSlider';
 import { FullScreenCompare } from './components/FullScreenCompare';
 import { FullScreenEditor } from './components/FullScreenEditor';
 import { ReferenceImages } from './components/ReferenceImages';
+import { PasswordModal } from './components/PasswordModal';
 
 interface ReferenceImage {
   file: File;
@@ -66,19 +67,13 @@ const App: React.FC = () => {
     const [referenceImages, setReferenceImages] = useState<ReferenceImage[]>([]);
     const [isRefImagesCollapsed, setIsRefImagesCollapsed] = useState<boolean>(true);
 
-    const [model, setModel] = useState<ModelType>('nano-banana');
+    const [model, setModel] = useState<ModelType>('gemini-2.5-flash-image');
     const [imageSize, setImageSize] = useState<ImageSize>('2k');
     const [aspectRatio, setAspectRatio] = useState<AspectRatio>('16:9');
     const [apiKey, setApiKey] = useState<string>('');
-    const [tramProxyBase, setTramProxyBase] = useState<string>(() => {
-        const fromEnv = (import.meta as any)?.env?.VITE_TRAM_PROXY_BASE;
-        if (typeof fromEnv === 'string' && fromEnv.trim()) return fromEnv.trim();
-        try {
-            return localStorage.getItem('TRAM_PROXY_BASE') || '';
-        } catch {
-            return '';
-        }
-    });
+    const [showProPasswordModal, setShowProPasswordModal] = useState<boolean>(false);
+    const [proVerified, setProVerified] = useState<boolean>(false);
+    const [pendingProSwitch, setPendingProSwitch] = useState<boolean>(false);
 
     const [preFullscreenState, setPreFullscreenState] = useState<{
         maskData: MaskData | null;
@@ -134,23 +129,6 @@ const App: React.FC = () => {
         };
     }, [originalImageUrl, inpaintedImageUrl]);
 
-    useEffect(() => {
-        try {
-            const v = tramProxyBase.trim();
-            if (!v) {
-                localStorage.removeItem('TRAM_PROXY_BASE');
-                return;
-            }
-            const u = new URL(v);
-            if (u.protocol !== 'https:' && u.protocol !== 'http:') {
-                localStorage.removeItem('TRAM_PROXY_BASE');
-                return;
-            }
-            localStorage.setItem('TRAM_PROXY_BASE', u.toString().replace(/\/+$/, ''));
-        } catch {
-        }
-    }, [tramProxyBase]);
-    
     const resetStateForNewImage = () => {
         setInpaintedImageFile(null);
         if (inpaintedImageUrl) URL.revokeObjectURL(inpaintedImageUrl);
@@ -176,6 +154,20 @@ const App: React.FC = () => {
             return [];
         });
         setIsRefImagesCollapsed(true);
+    };
+
+    const handleProClick = () => {
+        if (model === 'gemini-3-pro-image-preview') {
+            setModel('gemini-2.5-flash-image');
+            setProVerified(false);
+        } else {
+            setShowProPasswordModal(true);
+        }
+    };
+
+    const handleProPasswordSuccess = () => {
+        setModel('gemini-3-pro-image-preview');
+        setProVerified(true);
     };
 
     const handleImageUpload = (file: File) => {
@@ -367,12 +359,12 @@ const App: React.FC = () => {
                 });
             }));
 
-            if (!apiKey && model !== 'gemini-3-pro-image-preview') {
-                setError(model === 'nano-banana' || model === 'nano-banana-pro' ? 'Vui lòng nhập Banana API Key trước.' : 'Please enter your Gemini API Key first.');
+            if (!apiKey) {
+                setError('Please enter your Gemini API Key first.');
                 return;
             }
 
-            const requested4K = (model === 'gemini-3-pro-image-preview' || model === 'nano-banana-pro') && imageSize === '4k';
+            const requested4K = model === 'gemini-3-pro-image-preview' && imageSize === '4k';
             const runGenerate = (size: ImageSize) =>
                 generateInpaintedImage(
                     apiKey,
@@ -449,11 +441,6 @@ const App: React.FC = () => {
 
     const handleEnhancePrompt = useCallback(async () => {
         if (!originalImage) return;
-        
-        if (model === 'nano-banana-pro' || model === 'nano-banana') {
-            setNotice('Tính năng "Enhance Prompt" hiện chỉ hỗ trợ với Gemini API Key. Vui lòng nhập Gemini Key nếu muốn sử dụng.');
-            return;
-        }
 
         setIsEnhancingPrompt(true);
         try {
@@ -482,10 +469,9 @@ const App: React.FC = () => {
             <Header 
                 apiKey={apiKey}
                 onApiKeyChange={setApiKey}
-                tramProxyBase={tramProxyBase}
-                onTramProxyBaseChange={setTramProxyBase}
                 model={model} 
                 onModelChange={setModel} 
+                onProClick={handleProClick}
                 imageSize={imageSize} 
                 onImageSizeChange={setImageSize} 
                 isBusy={isBusy}
@@ -689,6 +675,11 @@ const App: React.FC = () => {
                     onToggleBrushActive={toggleBrushActive}
                 />
             )}
+            <PasswordModal 
+                isOpen={showProPasswordModal}
+                onClose={() => setShowProPasswordModal(false)}
+                onSuccess={handleProPasswordSuccess}
+            />
         </div>
     );
 };

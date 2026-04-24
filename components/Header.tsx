@@ -6,10 +6,9 @@ import type { ModelType, ImageSize } from '../types';
 interface HeaderProps {
     apiKey: string;
     onApiKeyChange: (key: string) => void;
-    tramProxyBase: string;
-    onTramProxyBaseChange: (value: string) => void;
     model: ModelType;
     onModelChange: (model: ModelType) => void;
+    onProClick: () => void;
     imageSize: ImageSize;
     onImageSizeChange: (size: ImageSize) => void;
     isBusy: boolean;
@@ -18,10 +17,9 @@ interface HeaderProps {
 export const Header: React.FC<HeaderProps> = ({ 
     apiKey,
     onApiKeyChange,
-    tramProxyBase,
-    onTramProxyBaseChange,
     model, 
     onModelChange, 
+    onProClick,
     imageSize, 
     onImageSizeChange, 
     isBusy,
@@ -42,26 +40,13 @@ export const Header: React.FC<HeaderProps> = ({
                     <KeyIcon className="w-4 h-4 text-slate-500 ml-1" />
                     <input
                         type="password"
-                        placeholder={(model === 'nano-banana-pro' || model === 'nano-banana') ? "Enter Banana API Key (sk_...)" : "Enter Gemini API Key..."}
+                        placeholder="Enter Gemini API Key..."
                         value={apiKey}
                         onChange={(e) => onApiKeyChange(e.target.value)}
                         disabled={isBusy}
                         className="bg-transparent text-xs text-slate-200 outline-none w-40 placeholder:text-slate-600"
                     />
                 </div>
-                {(model === 'nano-banana-pro' || model === 'nano-banana') && (
-                    <div className="flex items-center gap-2 bg-slate-900/80 rounded-lg p-1 border border-slate-600">
-                        <GlobeIcon className="w-4 h-4 text-slate-500 ml-1" />
-                        <input
-                            type="text"
-                            placeholder="Proxy URL (https://...workers.dev)"
-                            value={tramProxyBase}
-                            onChange={(e) => onTramProxyBaseChange(e.target.value)}
-                            disabled={isBusy}
-                            className="bg-transparent text-xs text-slate-200 outline-none w-56 placeholder:text-slate-600"
-                        />
-                    </div>
-                )}
             </div>
 
             {/* Credit Section - Aligned Right */}
@@ -71,7 +56,7 @@ export const Header: React.FC<HeaderProps> = ({
 
             <div className="flex items-center gap-2">
                 {/* Resolution Config */}
-                {(model === 'gemini-3-pro-image-preview' || model === 'nano-banana-pro') && (
+                {model === 'gemini-3-pro-image-preview' && (
                     <div className="flex bg-slate-900/80 rounded-lg p-0.5 border border-slate-600 mr-2">
                         {(['1k', '2k', '4k'] as ImageSize[]).map((size) => (
                             <button 
@@ -96,25 +81,11 @@ export const Header: React.FC<HeaderProps> = ({
                         Flash
                     </button>
                     <button 
-                        onClick={() => onModelChange('gemini-3-pro-image-preview')} 
+                        onClick={onProClick} 
                         disabled={isBusy} 
                         className={`px-3 py-1.5 text-xs font-bold rounded-md transition-all ${model === 'gemini-3-pro-image-preview' ? 'bg-cyan-600 text-white' : 'text-slate-500 hover:text-slate-300'}`}
                     >
                         Pro
-                    </button>
-                    <button 
-                        onClick={() => onModelChange('nano-banana-pro')} 
-                        disabled={isBusy} 
-                        className={`px-3 py-1.5 text-xs font-bold rounded-md transition-all ${model === 'nano-banana-pro' ? 'bg-yellow-600 text-white' : 'text-slate-500 hover:text-slate-300'}`}
-                    >
-                        Banana Pro
-                    </button>
-                    <button 
-                        onClick={() => onModelChange('nano-banana')} 
-                        disabled={isBusy} 
-                        className={`px-3 py-1.5 text-xs font-bold rounded-md transition-all ${model === 'nano-banana' ? 'bg-green-600 text-white' : 'text-slate-500 hover:text-slate-300'}`}
-                    >
-                        Banana
                     </button>
                 </div>
             </div>
